@@ -1,0 +1,203 @@
+.\" SlimStack Manual Page
+.\" Generated for SlimStack v0.1.0
+.TH SLIM 1 "January 2025" "SlimStack 0.1.0" "User Commands"
+.SH NAME
+slim \- dependency hygiene and waste elimination CLI tool
+.SH SYNOPSIS
+.B slim
+[\fIcommand\fR] [\fIsubcommand\fR] [\fIoptions\fR]
+.SH DESCRIPTION
+.B SlimStack
+is a CLI tool that helps developers identify, visualize, and safely remove unused dependencies and dependency bloat across Python and Node.js projects.
+.PP
+It analyzes your codebase using static analysis (AST for Python, regex for JavaScript/TypeScript) to determine which installed packages are actually being used.
+.PP
+.B Key features:
+.IP \(bu 2
+Python dependency analysis using AST-based import detection
+.IP \(bu 2
+Node.js dependency analysis with require/import detection
+.IP \(bu 2
+Disk usage visualization with ASCII charts
+.IP \(bu 2
+Safe pruning with dry-run default and confirmation prompts
+.IP \(bu 2
+JSON output for CI/CD integration
+.SH COMMANDS
+.SS "General Commands"
+.TP
+.B slim version
+Display the current version of SlimStack.
+.TP
+.B slim help
+Display usage help and examples.
+.SS "Python Commands"
+.TP
+.B slim py scan
+Scan the current Python project for dependencies. Detects which installed packages are used, unused, or transitive-only.
+.TP
+.B slim py scan \-\-json
+Output scan results as JSON for machine processing.
+.TP
+.B slim py scan \-\-path \fIPATH\fR
+Scan a specific project path instead of current directory.
+.TP
+.B slim py prune
+Show unused packages that can be removed (dry-run mode, no changes made).
+.TP
+.B slim py prune \-\-force
+Actually remove unused packages. Will prompt for confirmation before deletion.
+.TP
+.B slim py prune \-\-json
+Output prune results as JSON.
+.SS "Node.js Commands"
+.TP
+.B slim node scan
+Scan the current Node.js project for dependencies. Reads package.json and compares against actual imports in source files.
+.TP
+.B slim node scan \-\-json
+Output scan results as JSON.
+.TP
+.B slim node scan \-\-path \fIPATH\fR
+Scan a specific project path instead of current directory.
+.TP
+.B slim node prune
+Show unused packages that can be removed (dry-run mode).
+.TP
+.B slim node prune \-\-force
+Actually remove unused packages using npm uninstall.
+.TP
+.B slim node prune \-\-include\-dev
+Also include unused devDependencies in the prune list.
+.SS "Disk Usage Commands"
+.TP
+.B slim disk
+Show disk usage by ecosystem (Python, Node.js, Docker).
+.TP
+.B slim disk \-\-by project
+Group disk usage by project instead of ecosystem.
+.TP
+.B slim disk \-\-top \fIN\fR
+Limit results to top N items by size.
+.TP
+.B slim disk \-\-path \fIPATH\fR
+Scan a specific directory instead of current directory.
+.TP
+.B slim disk \-\-json
+Output disk usage as JSON.
+.SH OPTIONS
+.TP
+.B \-\-json
+Output results in JSON format for machine processing. Available on all scan and prune commands.
+.TP
+.B \-\-path, \-p \fIPATH\fR
+Specify project path. Defaults to current working directory.
+.TP
+.B \-\-force
+For prune commands: actually remove packages (with confirmation prompt). Without this flag, prune runs in dry-run mode.
+.TP
+.B \-\-dry\-run
+For prune commands: show what would be removed without making changes. This is the default behavior.
+.TP
+.B \-\-top \fIN\fR
+For disk command: limit number of results displayed.
+.TP
+.B \-\-include\-dev
+For node prune: include devDependencies in the removal list.
+.SH SAFETY
+.B SlimStack
+is designed with safety as a priority:
+.IP \(bu 2
+\fBRead-only by default\fR: All scan commands never modify anything.
+.IP \(bu 2
+\fBDry-run default\fR: Prune commands show what would be removed without actually removing anything.
+.IP \(bu 2
+\fBConfirmation prompts\fR: The \-\-force flag requires explicit "y" confirmation before deletion.
+.IP \(bu 2
+\fBVirtual environment protection\fR: Python pruning requires running inside a virtual environment.
+.IP \(bu 2
+\fBProtected packages\fR: pip, setuptools, and wheel are never removed.
+.SH EXAMPLES
+.PP
+Scan a Python project:
+.RS
+.nf
+$ slim py scan
+.fi
+.RE
+.PP
+Get JSON output for CI/CD:
+.RS
+.nf
+$ slim py scan --json > deps.json
+.fi
+.RE
+.PP
+Preview unused packages:
+.RS
+.nf
+$ slim py prune
+.fi
+.RE
+.PP
+Remove unused packages:
+.RS
+.nf
+$ slim py prune --force
+.fi
+.RE
+.PP
+Check disk usage:
+.RS
+.nf
+$ slim disk --top 10
+.fi
+.RE
+.PP
+Scan a specific path:
+.RS
+.nf
+$ slim py scan --path /path/to/project
+.fi
+.RE
+.SH EXIT STATUS
+.TP
+.B 0
+Success
+.TP
+.B 1
+Error occurred (missing package.json, not in virtualenv for prune, etc.)
+.TP
+.B 130
+Interrupted by user (Ctrl+C)
+.SH FILES
+.TP
+.I pyproject.toml, setup.py
+Python project markers
+.TP
+.I package.json
+Node.js project marker
+.TP
+.I venv/, .venv/, env/
+Python virtual environment directories
+.TP
+.I node_modules/
+Node.js dependencies directory
+.SH ENVIRONMENT
+.TP
+.B VIRTUAL_ENV
+If set, indicates an active Python virtual environment.
+.SH BUGS
+Dynamic imports (e.g., \fB__import__(name)\fR in Python or \fBrequire(variable)\fR in Node.js) cannot be detected by static analysis and are logged as "unknown".
+.PP
+Report bugs at: https://github.com/arceuzvx/SlimStack/issues
+.SH AUTHOR
+Written by arceuzvx.
+.SH COPYRIGHT
+MIT License. Copyright (c) 2025 arceuzvx.
+.SH SEE ALSO
+.BR pip (1),
+.BR npm (1),
+.BR docker (1)
+.PP
+Full documentation: https://github.com/arceuzvx/SlimStack

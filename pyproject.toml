@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "slimstack"
+version = "0.1.0"
+description = "CLI tool for dependency hygiene and waste elimination"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.11"
+authors = [
+    {name = "arceuzvx"}
+]
+keywords = ["dependencies", "cleanup", "python", "nodejs", "cli"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Build Tools",
+    "Topic :: System :: Systems Administration",
+]
+
+[project.scripts]
+slim = "slim.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/arceuzvx/SlimStack"
+Repository = "https://github.com/arceuzvx/SlimStack"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["slim*"]
+
+[tool.setuptools.data-files]
+"share/man/man1" = ["man/slim.1"]
+
