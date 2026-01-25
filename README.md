@@ -40,16 +40,16 @@ man ./man/slim.1
 
 ```bash
 # Scan current Python project
-slim py scan
+slim scan -py
 
 # Scan with JSON output
-slim py scan --json
+slim scan -py --json
 
 # Show unused packages (dry-run, safe)
-slim py prune
+slim prune -py
 
 # Actually remove unused packages
-slim py prune --force
+slim prune -py --force
 ```
 
 **Example output:**
@@ -72,23 +72,23 @@ Unused Packages:
   - isort (5.10.1)
   - pytest (7.1.2)
   
-Run 'slim py prune' to see removal options
+Run 'slim prune -py' to see removal options
 ```
 
 ### Node.js Commands
 
 ```bash
 # Scan current Node.js project
-slim node scan
+slim scan -node
 
 # Scan with JSON output
-slim node scan --json
+slim scan -node --json
 
 # Show unused packages (dry-run)
-slim node prune
+slim prune -node
 
 # Actually remove unused packages
-slim node prune --force
+slim prune -node --force
 ```
 
 **Example output:**
@@ -200,7 +200,7 @@ import utils from './utils';         // Local file
 All commands support `--json` for CI/CD integration:
 
 ```bash
-slim py scan --json > deps.json
+slim scan -py --json > deps.json
 ```
 
 ```json
@@ -236,4 +236,4 @@ Contributions are welcome. Please submit a Pull Request.
 
 ## License
 
-MIT License - Copyright (c) 2025 arceuzvx
+MIT License - Copyright (c) 2026 arceuzvx

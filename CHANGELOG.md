@@ -5,7 +5,7 @@ All notable changes to SlimStack will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.1.0] - 2025-01-23
+## [0.1.0] - 2026-01-23
 
 Initial release of SlimStack - Dependency hygiene and waste elimination CLI tool.
 
@@ -36,10 +36,10 @@ Initial release of SlimStack - Dependency hygiene and waste elimination CLI tool
 - **CLI Commands**
   - `slim version` - Display version
   - `slim help` - Show usage help
-  - `slim py scan` - Scan Python dependencies
-  - `slim py prune` - Remove unused Python packages
-  - `slim node scan` - Scan Node.js dependencies
-  - `slim node prune` - Remove unused Node packages
+  - `slim scan -py` - Scan Python dependencies
+  - `slim scan -node` - Scan Node.js dependencies  
+  - `slim prune -py` - Remove unused Python packages
+  - `slim prune -node` - Remove unused Node packages
   - `slim disk` - Disk usage analysis
 
 - **Safety Features**

@@ -1,11 +1,17 @@
 .\" SlimStack Manual Page
 .\" Generated for SlimStack v0.1.0
-.TH SLIM 1 "January 2025" "SlimStack 0.1.0" "User Commands"
+.TH SLIM 1 "January 2026" "SlimStack 0.1.0" "User Commands"
 .SH NAME
 slim \- dependency hygiene and waste elimination CLI tool
 .SH SYNOPSIS
 .B slim
-[\fIcommand\fR] [\fIsubcommand\fR] [\fIoptions\fR]
+[\fIcommand\fR] [\fIoptions\fR]
+.PP
+.B slim scan
+\fB\-py\fR | \fB\-node\fR [\fIoptions\fR]
+.PP
+.B slim prune
+\fB\-py\fR | \fB\-node\fR [\fIoptions\fR]
 .SH DESCRIPTION
 .B SlimStack
 is a CLI tool that helps developers identify, visualize, and safely remove unused dependencies and dependency bloat across Python and Node.js projects.
@@ -31,43 +37,46 @@ Display the current version of SlimStack.
 .TP
 .B slim help
 Display usage help and examples.
-.SS "Python Commands"
 .TP
-.B slim py scan
+.B slim man
+Display detailed manual with comprehensive documentation.
+.SS "Scan Commands"
+.TP
+.B slim scan \-py
 Scan the current Python project for dependencies. Detects which installed packages are used, unused, or transitive-only.
 .TP
-.B slim py scan \-\-json
+.B slim scan \-py \-\-json
 Output scan results as JSON for machine processing.
 .TP
-.B slim py scan \-\-path \fIPATH\fR
+.B slim scan \-py \-\-path \fIPATH\fR
 Scan a specific project path instead of current directory.
 .TP
-.B slim py prune
-Show unused packages that can be removed (dry-run mode, no changes made).
-.TP
-.B slim py prune \-\-force
-Actually remove unused packages. Will prompt for confirmation before deletion.
-.TP
-.B slim py prune \-\-json
-Output prune results as JSON.
-.SS "Node.js Commands"
-.TP
-.B slim node scan
+.B slim scan \-node
 Scan the current Node.js project for dependencies. Reads package.json and compares against actual imports in source files.
 .TP
-.B slim node scan \-\-json
+.B slim scan \-node \-\-json
 Output scan results as JSON.
 .TP
-.B slim node scan \-\-path \fIPATH\fR
+.B slim scan \-node \-\-path \fIPATH\fR
 Scan a specific project path instead of current directory.
+.SS "Prune Commands"
 .TP
-.B slim node prune
-Show unused packages that can be removed (dry-run mode).
+.B slim prune \-py
+Show unused Python packages that can be removed (dry-run mode, no changes made).
 .TP
-.B slim node prune \-\-force
+.B slim prune \-py \-\-force
+Actually remove unused Python packages. Will prompt for confirmation before deletion.
+.TP
+.B slim prune \-py \-\-json
+Output prune results as JSON.
+.TP
+.B slim prune \-node
+Show unused Node.js packages that can be removed (dry-run mode).
+.TP
+.B slim prune \-node \-\-force
 Actually remove unused packages using npm uninstall.
 .TP
-.B slim node prune \-\-include\-dev
+.B slim prune \-node \-\-include\-dev
 Also include unused devDependencies in the prune list.
 .SS "Disk Usage Commands"
 .TP
@@ -86,6 +95,12 @@ Scan a specific directory instead of current directory.
 .B slim disk \-\-json
 Output disk usage as JSON.
 .SH OPTIONS
+.TP
+.B \-py, \-\-py
+Select Python language for scan or prune commands.
+.TP
+.B \-node, \-\-node
+Select Node.js language for scan or prune commands.
 .TP
 .B \-\-json
 Output results in JSON format for machine processing. Available on all scan and prune commands.
@@ -122,28 +137,35 @@ is designed with safety as a priority:
 Scan a Python project:
 .RS
 .nf
-$ slim py scan
+$ slim scan -py
 .fi
 .RE
 .PP
 Get JSON output for CI/CD:
 .RS
 .nf
-$ slim py scan --json > deps.json
+$ slim scan -py --json > deps.json
 .fi
 .RE
 .PP
 Preview unused packages:
 .RS
 .nf
-$ slim py prune
+$ slim prune -py
 .fi
 .RE
 .PP
 Remove unused packages:
 .RS
 .nf
-$ slim py prune --force
+$ slim prune -py --force
+.fi
+.RE
+.PP
+Scan a Node.js project:
+.RS
+.nf
+$ slim scan -node
 .fi
 .RE
 .PP
@@ -157,7 +179,7 @@ $ slim disk --top 10
 Scan a specific path:
 .RS
 .nf
-$ slim py scan --path /path/to/project
+$ slim scan -py --path /path/to/project
 .fi
 .RE
 .SH EXIT STATUS
@@ -194,7 +216,7 @@ Report bugs at: https://github.com/arceuzvx/SlimStack/issues
 .SH AUTHOR
 Written by arceuzvx.
 .SH COPYRIGHT
-MIT License. Copyright (c) 2025 arceuzvx.
+MIT License. Copyright (c) 2026 arceuzvx.
 .SH SEE ALSO
 .BR pip (1),
 .BR npm (1),

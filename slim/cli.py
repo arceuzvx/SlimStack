@@ -4,17 +4,18 @@ SlimStack CLI - Dependency hygiene and waste elimination.
 
 Usage:
     slim help              Show help
+    slim man               Show detailed manual
     slim version           Show version
     
-    slim py scan           Scan Python project dependencies
-    slim py scan --json    Output as JSON
-    slim py prune          Show unused packages (dry-run)
-    slim py prune --force  Actually remove unused packages
+    slim scan -py          Scan Python project dependencies
+    slim scan -py --json   Output as JSON
+    slim scan -node        Scan Node.js project dependencies
+    slim scan -node --json Output as JSON
     
-    slim node scan         Scan Node.js project dependencies
-    slim node scan --json  Output as JSON
-    slim node prune        Show unused packages (dry-run)
-    slim node prune --force Actually remove unused packages
+    slim prune -py         Show unused Python packages (dry-run)
+    slim prune -py --force Actually remove unused packages
+    slim prune -node       Show unused Node.js packages (dry-run)
+    slim prune -node --force Actually remove unused packages
     
     slim disk              Show disk usage by ecosystem
     slim disk --by project Show disk usage by project
@@ -48,7 +49,353 @@ def cmd_help(args: argparse.Namespace) -> int:
     return 0
 
 
-def cmd_py_scan(args: argparse.Namespace) -> int:
+def cmd_man(args: argparse.Namespace) -> int:
+    """Show detailed manual."""
+    colors_enabled = is_tty()
+    
+    # Color helpers
+    def bold(text: str) -> str:
+        return f"{Colors.BOLD}{text}{Colors.RESET}" if colors_enabled else text
+    
+    def cyan(text: str) -> str:
+        return f"{Colors.CYAN}{text}{Colors.RESET}" if colors_enabled else text
+    
+    def yellow(text: str) -> str:
+        return f"{Colors.YELLOW}{text}{Colors.RESET}" if colors_enabled else text
+    
+    def green(text: str) -> str:
+        return f"{Colors.GREEN}{text}{Colors.RESET}" if colors_enabled else text
+    
+    def dim(text: str) -> str:
+        return f"{Colors.DIM}{text}{Colors.RESET}" if colors_enabled else text
+    
+    def magenta(text: str) -> str:
+        return f"{Colors.MAGENTA}{text}{Colors.RESET}" if colors_enabled else text
+    
+    manual = f"""
+{bold("━" * 70)}
+{bold("                         SLIMSTACK MANUAL")}
+{bold("━" * 70)}
+
+{bold("NAME")}
+    {cyan("slim")} - dependency hygiene and waste elimination CLI tool
+
+{bold("VERSION")}
+    SlimStack v{VERSION}
+
+{bold("SYNOPSIS")}
+    {cyan("slim")} <command> [options]
+    {cyan("slim")} <command> {yellow("-py")} | {yellow("-node")} [options]
+
+{bold("━" * 70)}
+{bold("                              DESCRIPTION")}
+{bold("━" * 70)}
+
+SlimStack is a CLI tool that helps developers identify, visualize, and 
+safely remove unused dependencies and dependency bloat across Python 
+and Node.js projects.
+
+It uses {green("static analysis")} to determine which installed packages are 
+actually being used:
+  • {cyan("Python")}:  AST-based import detection (accurate, handles all syntax)
+  • {cyan("Node.js")}: Regex-based require/import detection (fast, comprehensive)
+
+{bold("KEY BENEFITS")}
+  ✓ Reduce project size and attack surface
+  ✓ Speed up CI/CD pipelines and Docker builds
+  ✓ Keep dependencies clean and maintainable
+  ✓ Visualize disk usage across projects
+
+{bold("━" * 70)}
+{bold("                               COMMANDS")}
+{bold("━" * 70)}
+
+{bold("GENERAL COMMANDS")}
+
+  {cyan("slim version")}
+      Display the current version of SlimStack.
+
+  {cyan("slim help")}
+      Display quick usage help and examples.
+
+  {cyan("slim man")}
+      Display this detailed manual.
+
+{bold("SCAN COMMANDS")} {dim("(read-only, never modifies anything)")}
+
+  {cyan("slim scan -py")} [options]
+      Scan the current Python project for dependencies.
+      Detects which installed packages are used, unused, or transitive-only.
+
+      {yellow("Options:")}
+        {green("--json")}        Output results as JSON for CI/CD pipelines
+        {green("--path, -p")}    Specify project path (default: current directory)
+
+      {yellow("What it analyzes:")}
+        • All .py files in the project (excluding venv, __pycache__)
+        • Installed packages via pip freeze
+        • Import statements using Python's AST module
+
+  {cyan("slim scan -node")} [options]
+      Scan the current Node.js project for dependencies.
+      Reads package.json and compares against actual imports in source files.
+
+      {yellow("Options:")}
+        {green("--json")}        Output results as JSON
+        {green("--path, -p")}    Specify project path (default: current directory)
+
+      {yellow("What it analyzes:")}
+        • All .js, .jsx, .ts, .tsx, .mjs, .cjs files
+        • package.json dependencies and devDependencies
+        • require() calls and ESM import statements
+
+{bold("PRUNE COMMANDS")} {dim("(dry-run by default, safe)")}
+
+  {cyan("slim prune -py")} [options]
+      Show unused Python packages that can be removed.
+      {yellow("Default is dry-run mode")} - no changes are made.
+
+      {yellow("Options:")}
+        {green("--force")}       Actually remove packages (with confirmation)
+        {green("--dry-run")}     Show what would be removed (default)
+        {green("--json")}        Output results as JSON
+        {green("--path, -p")}    Specify project path
+
+      {yellow("Requirements:")}
+        • Must be running inside a virtual environment
+        • Protected packages (pip, setuptools, wheel) are never removed
+
+  {cyan("slim prune -node")} [options]
+      Show unused Node.js packages that can be removed.
+
+      {yellow("Options:")}
+        {green("--force")}       Actually remove packages via npm uninstall
+        {green("--include-dev")} Include unused devDependencies in removal
+        {green("--dry-run")}     Show what would be removed (default)
+        {green("--json")}        Output results as JSON
+        {green("--path, -p")}    Specify project path
+
+{bold("DISK USAGE COMMANDS")} {dim("(read-only)")}
+
+  {cyan("slim disk")} [options]
+      Show disk usage by ecosystem with ASCII bar charts.
+      Scans for Python venvs, node_modules, and Docker images.
+
+      {yellow("Options:")}
+        {green("--by project")}  Group by project instead of ecosystem
+        {green("--top N")}       Limit results to top N items by size
+        {green("--path, -p")}    Scan a specific directory
+        {green("--json")}        Output as JSON
+
+{bold("━" * 70)}
+{bold("                           SAFETY FEATURES")}
+{bold("━" * 70)}
+
+SlimStack is designed with {green("safety as the #1 priority")}:
+
+  {green("✓ Read-only by default")}
+    All scan commands never modify anything on disk.
+
+  {green("✓ Dry-run for prune")}
+    Prune commands only show what would be removed unless --force is used.
+
+  {green("✓ Confirmation prompts")}
+    The --force flag requires explicit "y" confirmation before any deletion.
+
+  {green("✓ Virtual environment protection")}
+    Python pruning REQUIRES running inside a virtual environment.
+    This prevents accidental damage to your system Python installation.
+
+  {green("✓ Protected packages")}
+    Critical packages are NEVER removed:
+      • pip, setuptools, wheel (Python)
+      • npm itself is never touched (Node.js)
+
+  {green("✓ Project-local only")}
+    Only operates on project-local dependencies, never global packages.
+
+{bold("━" * 70)}
+{bold("                         DETECTION METHODS")}
+{bold("━" * 70)}
+
+{bold("PYTHON IMPORT DETECTION")}
+
+  SlimStack uses Python's {cyan("ast")} module for accurate static analysis:
+
+    {green("✓ Detected:")}
+      import requests
+      from flask import Flask
+      from PIL import Image
+      import numpy as np
+
+    {yellow("⚠ Skipped (stdlib):")}
+      import os
+      import sys
+      from pathlib import Path
+
+    {yellow("⚠ Not detected (dynamic):")}
+      module = __import__(name)
+      importlib.import_module(name)
+
+  {dim("Note: Dynamic imports are logged as 'unknown' for manual review.")}
+
+{bold("PACKAGE NAME MAPPING")}
+
+  SlimStack handles packages where import name differs from package name:
+
+    {dim("Package Name")}     →  {dim("Import Name")}
+    ─────────────────────────────────
+    Pillow            →  PIL
+    opencv-python     →  cv2
+    scikit-learn      →  sklearn
+    beautifulsoup4    →  bs4
+    python-dateutil   →  dateutil
+    PyYAML            →  yaml
+    python-dotenv     →  dotenv
+
+{bold("NODE.JS IMPORT DETECTION")}
+
+  SlimStack uses regex patterns to detect JavaScript imports:
+
+    {green("✓ Detected:")}
+      const express = require('express');
+      import React from 'react';
+      import {{ useState }} from 'react';
+      import('./dynamic-module');
+      require.resolve('package');
+
+    {yellow("⚠ Not detected (relative paths):")}
+      import utils from './utils';
+      require('../lib/helper');
+
+    {yellow("⚠ Not detected (variable):")}
+      require(packageName);
+
+{bold("━" * 70)}
+{bold("                              EXAMPLES")}
+{bold("━" * 70)}
+
+{bold("Basic Python Workflow")}
+
+  {dim("# 1. Scan to see what's unused")}
+  $ {cyan("slim scan -py")}
+
+  {dim("# 2. Preview what would be removed")}
+  $ {cyan("slim prune -py")}
+
+  {dim("# 3. Actually remove unused packages")}
+  $ {cyan("slim prune -py --force")}
+
+{bold("Basic Node.js Workflow")}
+
+  {dim("# 1. Scan the project")}
+  $ {cyan("slim scan -node")}
+
+  {dim("# 2. Preview removal (including devDeps)")}
+  $ {cyan("slim prune -node --include-dev")}
+
+  {dim("# 3. Remove unused packages")}
+  $ {cyan("slim prune -node --force")}
+
+{bold("CI/CD Integration")}
+
+  {dim("# Get JSON output for automated processing")}
+  $ {cyan("slim scan -py --json")} > deps.json
+
+  {dim("# Check for unused deps in CI pipeline")}
+  $ {cyan("slim scan -node --json")} | jq '.unused_packages | length'
+
+{bold("Disk Usage Analysis")}
+
+  {dim("# See overall ecosystem usage")}
+  $ {cyan("slim disk")}
+
+  {dim("# Find heaviest projects")}
+  $ {cyan("slim disk --by project --top 10")}
+
+  {dim("# Scan a specific directory")}
+  $ {cyan("slim disk --path ~/projects --top 5")}
+
+{bold("━" * 70)}
+{bold("                           JSON OUTPUT")}
+{bold("━" * 70)}
+
+All commands support {green("--json")} for machine-readable output:
+
+{bold("Python Scan JSON Structure")}
+  {{
+    "project_path": "/path/to/project",
+    "in_virtualenv": true,
+    "files_scanned": 42,
+    "packages": {{
+      "total": 28,
+      "used": ["flask", "requests"],
+      "unused": ["black", "isort"],
+      "transitive_only": []
+    }},
+    "unknown_imports": ["mymodule"]
+  }}
+
+{bold("Node.js Scan JSON Structure")}
+  {{
+    "project_path": "/path/to/project",
+    "has_package_json": true,
+    "files_scanned": 156,
+    "node_modules_size_bytes": 257294336,
+    "dependencies": {{"express": "4.18.0"}},
+    "dev_dependencies": {{"jest": "29.0.0"}},
+    "unused_packages": ["lodash", "moment"],
+    "unused_dev_packages": ["@types/unused"]
+  }}
+
+{bold("━" * 70)}
+{bold("                          TROUBLESHOOTING")}
+{bold("━" * 70)}
+
+{yellow("Q: Why are some packages marked as unused when I use them?")}
+  A: SlimStack uses static analysis. It cannot detect:
+     • Dynamic imports: __import__(name), importlib.import_module()
+     • String-based requires: require(variable)
+     • Packages used only in config files (webpack, babel, etc.)
+     • Pytest plugins, Django apps loaded via settings
+
+{yellow("Q: Why does Python prune require a virtual environment?")}
+  A: This is a safety feature to prevent accidentally removing system
+     packages. Always work in a virtual environment for Python development.
+
+{yellow("Q: Why are devDependencies shown as unused?")}
+  A: devDependencies are often used by tooling (webpack, jest, eslint)
+     rather than imported directly. Use --include-dev cautiously.
+
+{yellow("Q: How do I exclude certain packages from pruning?")}
+  A: Currently, manually review the dry-run output before using --force.
+     Configuration file support is planned for a future release.
+
+{bold("━" * 70)}
+{bold("                            EXIT CODES")}
+{bold("━" * 70)}
+
+  {green("0")}   - Success
+  {yellow("1")}   - Error (missing package.json, not in virtualenv, etc.)
+  {yellow("130")} - Interrupted by user (Ctrl+C)
+
+{bold("━" * 70)}
+{bold("                           MORE INFO")}
+{bold("━" * 70)}
+
+  {cyan("Repository")}:   https://github.com/arceuzvx/SlimStack
+  {cyan("Issues")}:       https://github.com/arceuzvx/SlimStack/issues
+  {cyan("License")}:      MIT License
+  {cyan("Author")}:       arceuzvx
+
+{bold("━" * 70)}
+"""
+    
+    print(manual)
+    return 0
+
+
+def _scan_python(args: argparse.Namespace) -> int:
     """Scan Python project for dependencies."""
     from slim.scanners.python_scanner import scan_python_project, get_scan_result_dict
     from slim.visuals.tables import render_package_table, render_summary_box
@@ -93,7 +440,7 @@ def cmd_py_scan(args: argparse.Namespace) -> int:
             version = pkg_info.version if pkg_info else "?"
             print(f"  • {pkg} ({version})")
         
-        print(f"\n→ Run 'slim py prune' to see removal options")
+        print(f"\n→ Run 'slim prune -py' to see removal options")
     else:
         print(f"\n{Colors.GREEN if colors_enabled else ''}✓ No unused packages found!{Colors.RESET if colors_enabled else ''}")
     
@@ -112,7 +459,7 @@ def cmd_py_scan(args: argparse.Namespace) -> int:
     return 0
 
 
-def cmd_py_prune(args: argparse.Namespace) -> int:
+def _prune_python(args: argparse.Namespace) -> int:
     """Prune unused Python packages."""
     from slim.pruners.python_pruner import prune_python, get_prune_result_dict
     
@@ -131,7 +478,7 @@ def cmd_py_prune(args: argparse.Namespace) -> int:
     return 0 if not result.errors else 1
 
 
-def cmd_node_scan(args: argparse.Namespace) -> int:
+def _scan_node(args: argparse.Namespace) -> int:
     """Scan Node.js project for dependencies."""
     from slim.scanners.node_scanner import scan_node_project, get_scan_result_dict
     from slim.visuals.tables import render_summary_box
@@ -180,7 +527,7 @@ def cmd_node_scan(args: argparse.Namespace) -> int:
             size_str = format_size(size) if size > 0 else "?"
             print(f"  • {pkg} ({size_str})")
         
-        print(f"\n→ Run 'slim node prune' to see removal options")
+        print(f"\n→ Run 'slim prune -node' to see removal options")
     else:
         print(f"\n{Colors.GREEN if colors_enabled else ''}✓ All dependencies are used!{Colors.RESET if colors_enabled else ''}")
     
@@ -200,7 +547,7 @@ def cmd_node_scan(args: argparse.Namespace) -> int:
     return 0
 
 
-def cmd_node_prune(args: argparse.Namespace) -> int:
+def _prune_node(args: argparse.Namespace) -> int:
     """Prune unused Node.js packages."""
     from slim.pruners.node_pruner import prune_node, get_prune_result_dict
     
@@ -218,6 +565,28 @@ def cmd_node_prune(args: argparse.Namespace) -> int:
         output_json(get_prune_result_dict(result))
     
     return 0 if not result.errors else 1
+
+
+def cmd_scan(args: argparse.Namespace) -> int:
+    """Dispatch scan command to appropriate language scanner."""
+    if args.lang_py:
+        return _scan_python(args)
+    elif args.lang_node:
+        return _scan_node(args)
+    else:
+        error("Please specify a language: -py or -node")
+        return 1
+
+
+def cmd_prune(args: argparse.Namespace) -> int:
+    """Dispatch prune command to appropriate language pruner."""
+    if args.lang_py:
+        return _prune_python(args)
+    elif args.lang_node:
+        return _prune_node(args)
+    else:
+        error("Please specify a language: -py or -node")
+        return 1
 
 
 def cmd_disk(args: argparse.Namespace) -> int:
@@ -322,42 +691,30 @@ def create_parser() -> argparse.ArgumentParser:
     help_parser = subparsers.add_parser("help", help="Show help")
     help_parser.set_defaults(func=cmd_help)
     
-    # py command (with subcommands)
-    py_parser = subparsers.add_parser("py", help="Python commands")
-    py_subparsers = py_parser.add_subparsers(dest="py_command", help="Python subcommands")
+    # man command (detailed manual)
+    man_parser = subparsers.add_parser("man", help="Show detailed manual")
+    man_parser.set_defaults(func=cmd_man)
     
-    # py scan
-    py_scan_parser = py_subparsers.add_parser("scan", help="Scan Python dependencies")
-    py_scan_parser.add_argument("--json", action="store_true", help="Output as JSON")
-    py_scan_parser.add_argument("--path", "-p", help="Project path (default: current directory)")
-    py_scan_parser.set_defaults(func=cmd_py_scan)
+    # scan command with language flags
+    scan_parser = subparsers.add_parser("scan", help="Scan project dependencies")
+    scan_lang_group = scan_parser.add_mutually_exclusive_group(required=True)
+    scan_lang_group.add_argument("-py", "--py", action="store_true", dest="lang_py", help="Scan Python project")
+    scan_lang_group.add_argument("-node", "--node", action="store_true", dest="lang_node", help="Scan Node.js project")
+    scan_parser.add_argument("--json", action="store_true", help="Output as JSON")
+    scan_parser.add_argument("--path", "-p", help="Project path (default: current directory)")
+    scan_parser.set_defaults(func=cmd_scan)
     
-    # py prune
-    py_prune_parser = py_subparsers.add_parser("prune", help="Remove unused Python packages")
-    py_prune_parser.add_argument("--dry-run", action="store_true", help="Show what would be removed (default)")
-    py_prune_parser.add_argument("--force", action="store_true", help="Actually remove packages")
-    py_prune_parser.add_argument("--json", action="store_true", help="Output as JSON")
-    py_prune_parser.add_argument("--path", "-p", help="Project path (default: current directory)")
-    py_prune_parser.set_defaults(func=cmd_py_prune)
-    
-    # node command (with subcommands)
-    node_parser = subparsers.add_parser("node", help="Node.js commands")
-    node_subparsers = node_parser.add_subparsers(dest="node_command", help="Node.js subcommands")
-    
-    # node scan
-    node_scan_parser = node_subparsers.add_parser("scan", help="Scan Node.js dependencies")
-    node_scan_parser.add_argument("--json", action="store_true", help="Output as JSON")
-    node_scan_parser.add_argument("--path", "-p", help="Project path (default: current directory)")
-    node_scan_parser.set_defaults(func=cmd_node_scan)
-    
-    # node prune
-    node_prune_parser = node_subparsers.add_parser("prune", help="Remove unused Node.js packages")
-    node_prune_parser.add_argument("--dry-run", action="store_true", help="Show what would be removed (default)")
-    node_prune_parser.add_argument("--force", action="store_true", help="Actually remove packages")
-    node_prune_parser.add_argument("--include-dev", action="store_true", help="Also remove unused devDependencies")
-    node_prune_parser.add_argument("--json", action="store_true", help="Output as JSON")
-    node_prune_parser.add_argument("--path", "-p", help="Project path (default: current directory)")
-    node_prune_parser.set_defaults(func=cmd_node_prune)
+    # prune command with language flags
+    prune_parser = subparsers.add_parser("prune", help="Remove unused packages")
+    prune_lang_group = prune_parser.add_mutually_exclusive_group(required=True)
+    prune_lang_group.add_argument("-py", "--py", action="store_true", dest="lang_py", help="Prune Python packages")
+    prune_lang_group.add_argument("-node", "--node", action="store_true", dest="lang_node", help="Prune Node.js packages")
+    prune_parser.add_argument("--dry-run", action="store_true", help="Show what would be removed (default)")
+    prune_parser.add_argument("--force", action="store_true", help="Actually remove packages")
+    prune_parser.add_argument("--include-dev", action="store_true", help="Also remove unused devDependencies (Node.js only)")
+    prune_parser.add_argument("--json", action="store_true", help="Output as JSON")
+    prune_parser.add_argument("--path", "-p", help="Project path (default: current directory)")
+    prune_parser.set_defaults(func=cmd_prune)
     
     # disk command
     disk_parser = subparsers.add_parser("disk", help="Disk usage analysis")
@@ -383,15 +740,6 @@ def main() -> int:
     if args.command is None:
         parser.print_help()
         return 0
-    
-    # Handle subcommand requirements
-    if args.command == "py" and getattr(args, "py_command", None) is None:
-        print("Usage: slim py {scan|prune}")
-        return 1
-    
-    if args.command == "node" and getattr(args, "node_command", None) is None:
-        print("Usage: slim node {scan|prune}")
-        return 1
     
     # Execute command
     if hasattr(args, "func"):
