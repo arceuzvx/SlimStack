@@ -36,11 +36,21 @@ Initial release of SlimStack - Dependency hygiene and waste elimination CLI tool
 - **CLI Commands**
   - `slim version` - Display version
   - `slim help` - Show usage help
+  - `slim man` - Display detailed manual
   - `slim scan -py` - Scan Python dependencies
   - `slim scan -node` - Scan Node.js dependencies  
   - `slim prune -py` - Remove unused Python packages
   - `slim prune -node` - Remove unused Node packages
   - `slim disk` - Disk usage analysis
+  - `slim docker` - Dockerfile security and optimization analysis
+
+- **Dockerfile Analysis** (NEW)
+  - Security anti-pattern detection (secrets in ENV, running as root, etc.)
+  - Hardened image recommendations (Chainguard, Alpine, distroless)
+  - Multi-stage build detection
+  - Best practice suggestions (HEALTHCHECK, COPY vs ADD, etc.)
+  - Severity filtering and security-only mode
+  - JSON output for CI/CD pipelines
 
 - **Safety Features**
   - Read-only scan operations by default
@@ -57,6 +67,7 @@ Initial release of SlimStack - Dependency hygiene and waste elimination CLI tool
 - **Documentation**
   - Comprehensive README with usage examples
   - Unix man page (`man slim`)
+  - Built-in manual (`slim man`)
 
 ## [Unreleased]
 

@@ -144,6 +144,60 @@ Node.js node_modules:
     324.1 MB  api-server/node_modules
 ```
 
+### Docker Commands
+
+```bash
+# Analyze Dockerfile for security and optimization issues
+slim docker
+
+# Output as JSON (for CI/CD)
+slim docker --json
+
+# Only show security issues
+slim docker --security-only
+
+# Filter by severity (critical, warning, info)
+slim docker --severity warning
+```
+
+**Example output:**
+```
+SlimStack Dockerfile Analysis
+================================
+
+Dockerfile: Dockerfile
+Base images: 1
+Multi-stage: No
+Runs as non-root: No
+Has HEALTHCHECK: No
+
+Issues Found (4):
+
+  🔴 Line 2: Potential secret exposed in ENV instruction
+     Category: security
+     → Use Docker secrets or mount secrets at runtime instead of ENV
+
+  🟡 Line 1: Container runs as root (no USER instruction)
+     Category: security
+     → Add 'USER nonroot' or 'USER 1000' to run as non-root user
+
+Image Recommendations:
+
+  Current:     python:3.12
+  Recommended: python:3.12-slim
+  Reason:      smaller - Debian slim variant, ~100MB smaller
+  Size:        ~150MB
+
+  Current:     python:3.12
+  Recommended: cgr.dev/chainguard/python:latest
+  Reason:      hardened - Chainguard hardened image, zero CVEs
+  Size:        ~50MB
+
+────────────────────────────────
+Summary: 1 critical, 2 warnings, 1 info
+         2 image recommendations
+```
+
 ## Safety
 
 SlimStack is designed with safety as a priority:

@@ -20,6 +20,9 @@ Usage:
     slim disk              Show disk usage by ecosystem
     slim disk --by project Show disk usage by project
     slim disk --top 10     Limit results
+    
+    slim docker            Analyze Dockerfile for issues
+    slim docker --json     Output as JSON
 """
 
 import argparse
@@ -673,6 +676,121 @@ def cmd_disk(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_docker_scan(args: argparse.Namespace) -> int:
+    """Scan Dockerfile for security issues and optimization opportunities."""
+    from slim.scanners.docker_scanner import scan_dockerfile, get_scan_result_dict
+    
+    project_path = Path(args.path) if args.path else None
+    result = scan_dockerfile(project_path=project_path)
+    
+    if args.json:
+        output_json(get_scan_result_dict(result))
+        return 0
+    
+    # Human-readable output
+    colors_enabled = is_tty()
+    
+    print()
+    if colors_enabled:
+        print(f"{Colors.BOLD}SlimStack Dockerfile Analysis{Colors.RESET}")
+    else:
+        print("SlimStack Dockerfile Analysis")
+    print("=" * 32)
+    
+    # Check if Dockerfile was found
+    if not result.base_images:
+        if result.issues and result.issues[0].message == "No Dockerfile found":
+            error("No Dockerfile found in project.")
+            return 1
+    
+    # Show basic info
+    print(f"\nDockerfile: {result.dockerfile_path}")
+    print(f"Base images: {len(result.base_images)}")
+    print(f"Multi-stage: {'Yes' if result.multi_stage else 'No'}")
+    print(f"Runs as non-root: {'Yes' if result.has_user_instruction else 'No'}")
+    print(f"Has HEALTHCHECK: {'Yes' if result.has_healthcheck else 'No'}")
+    
+    # Filter issues by severity if specified
+    issues = result.issues
+    min_severity = getattr(args, 'severity', None)
+    if min_severity:
+        severity_order = {"critical": 0, "warning": 1, "info": 2}
+        min_level = severity_order.get(min_severity.lower(), 2)
+        issues = [i for i in issues if severity_order.get(i.severity, 2) <= min_level]
+    
+    # Filter by security only if specified
+    if getattr(args, 'security_only', False):
+        issues = [i for i in issues if i.category == "security"]
+    
+    # Show issues
+    if issues:
+        print()
+        if colors_enabled:
+            print(f"{Colors.YELLOW}Issues Found ({len(issues)}):{Colors.RESET}")
+        else:
+            print(f"Issues Found ({len(issues)}):")
+        
+        for issue in issues:
+            # Severity icon and color
+            if issue.severity == "critical":
+                icon = "🔴" if colors_enabled else "[CRITICAL]"
+                color = Colors.RED if colors_enabled else ""
+            elif issue.severity == "warning":
+                icon = "🟡" if colors_enabled else "[WARNING]"
+                color = Colors.YELLOW if colors_enabled else ""
+            else:
+                icon = "🔵" if colors_enabled else "[INFO]"
+                color = Colors.CYAN if colors_enabled else ""
+            
+            reset = Colors.RESET if colors_enabled else ""
+            
+            print(f"\n  {icon} {color}Line {issue.line_number}: {issue.message}{reset}")
+            print(f"     Category: {issue.category}")
+            if colors_enabled:
+                print(f"     {Colors.DIM}→ {issue.suggestion}{Colors.RESET}")
+            else:
+                print(f"     → {issue.suggestion}")
+    else:
+        print(f"\n{Colors.GREEN if colors_enabled else ''}✓ No issues found!{Colors.RESET if colors_enabled else ''}")
+    
+    # Show recommendations
+    if result.recommendations:
+        print()
+        if colors_enabled:
+            print(f"{Colors.CYAN}Image Recommendations:{Colors.RESET}")
+        else:
+            print("Image Recommendations:")
+        
+        shown = set()
+        for rec in result.recommendations:
+            if rec.recommended_image in shown:
+                continue
+            shown.add(rec.recommended_image)
+            
+            print(f"\n  Current:     {rec.current_image}")
+            if colors_enabled:
+                print(f"  {Colors.GREEN}Recommended: {rec.recommended_image}{Colors.RESET}")
+            else:
+                print(f"  Recommended: {rec.recommended_image}")
+            print(f"  Reason:      {rec.reason} - {rec.description}")
+            if rec.size_estimate:
+                print(f"  Size:        {rec.size_estimate}")
+    
+    # Summary
+    critical = sum(1 for i in result.issues if i.severity == "critical")
+    warning = sum(1 for i in result.issues if i.severity == "warning")
+    info_count = sum(1 for i in result.issues if i.severity == "info")
+    
+    print(f"\n{'─' * 32}")
+    print(f"Summary: {critical} critical, {warning} warnings, {info_count} info")
+    
+    if result.recommendations:
+        print(f"         {len(result.recommendations)} image recommendations")
+    
+    # Return non-zero if critical issues found
+    return 1 if critical > 0 else 0
+
+
 def create_parser() -> argparse.ArgumentParser:
     """Create the argument parser."""
     parser = argparse.ArgumentParser(
@@ -723,6 +841,16 @@ def create_parser() -> argparse.ArgumentParser:
     disk_parser.add_argument("--json", action="store_true", help="Output as JSON")
     disk_parser.add_argument("--path", "-p", help="Path to scan (default: current directory)")
     disk_parser.set_defaults(func=cmd_disk)
+    
+    # docker scan command
+    docker_parser = subparsers.add_parser("docker", help="Dockerfile analysis and optimization")
+    docker_parser.add_argument("--json", action="store_true", help="Output as JSON")
+    docker_parser.add_argument("--path", "-p", help="Project path (default: current directory)")
+    docker_parser.add_argument("--severity", choices=["critical", "warning", "info"], 
+                               help="Minimum severity to report")
+    docker_parser.add_argument("--security-only", action="store_true", dest="security_only",
+                               help="Only show security-related issues")
+    docker_parser.set_defaults(func=cmd_docker_scan)
     
     return parser
 

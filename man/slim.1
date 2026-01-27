@@ -94,6 +94,22 @@ Scan a specific directory instead of current directory.
 .TP
 .B slim disk \-\-json
 Output disk usage as JSON.
+.SS "Docker Commands"
+.TP
+.B slim docker
+Analyze Dockerfile for security issues and optimization opportunities. Suggests hardened image alternatives.
+.TP
+.B slim docker \-\-json
+Output analysis results as JSON for CI/CD pipelines.
+.TP
+.B slim docker \-\-path \fIPATH\fR
+Analyze Dockerfile in a specific directory.
+.TP
+.B slim docker \-\-severity \fILEVEL\fR
+Filter issues by minimum severity (critical, warning, info).
+.TP
+.B slim docker \-\-security\-only
+Only show security-related issues.
 .SH OPTIONS
 .TP
 .B \-py, \-\-py
