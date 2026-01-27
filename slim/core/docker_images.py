@@ -1,280 +1,280 @@
-"""Docker image alternatives and hardened image mappings."""
+
+"""
+Docker image alternatives and hardened image mappings.
+
+Advisory-only: recommendations are heuristic and non-authoritative.
+"""
 
 from dataclasses import dataclass
+from enum import Enum
+from typing import Optional
 
 
-@dataclass
+class AlternativeReason(str, Enum):
+    HARDENED = "hardened"
+    SMALLER = "smaller"
+    DISTROLESS = "distroless"
+    ALPINE = "alpine"
+
+
+@dataclass(frozen=True)
 class ImageAlternative:
     """A recommended alternative for a base image."""
     image: str
-    reason: str  # "hardened", "smaller", "distroless", "alpine"
+    reason: AlternativeReason
     description: str
-    size_estimate: str | None = None  # e.g., "~50MB" or "~800MB savings"
+    size_estimate: Optional[str] = None  # heuristic only
 
 
-# Common base images and their recommended alternatives
-# Organized by base image family
+# -----------------------------
+# Static recommendation mapping
+# -----------------------------
+
 IMAGE_ALTERNATIVES: dict[str, list[ImageAlternative]] = {
-    # Python images
     "python": [
         ImageAlternative(
             image="{name}:{version}-slim",
-            reason="smaller",
-            description="Debian slim variant, ~100MB smaller",
+            reason=AlternativeReason.SMALLER,
+            description="Debian slim variant",
             size_estimate="~150MB",
         ),
         ImageAlternative(
             image="{name}:{version}-alpine",
-            reason="alpine",
-            description="Alpine Linux base, minimal footprint",
+            reason=AlternativeReason.ALPINE,
+            description="Alpine Linux base",
             size_estimate="~50MB",
         ),
         ImageAlternative(
-            image="cgr.dev/chainguard/python:latest",
-            reason="hardened",
-            description="Chainguard hardened image, zero CVEs, distroless",
+            image="cgr.dev/chainguard/python",
+            reason=AlternativeReason.HARDENED,
+            description="Chainguard hardened, distroless",
             size_estimate="~50MB",
         ),
     ],
-    
-    # Node.js images
     "node": [
         ImageAlternative(
             image="{name}:{version}-slim",
-            reason="smaller",
+            reason=AlternativeReason.SMALLER,
             description="Debian slim variant",
             size_estimate="~200MB",
         ),
         ImageAlternative(
             image="{name}:{version}-alpine",
-            reason="alpine",
-            description="Alpine Linux base, minimal footprint",
+            reason=AlternativeReason.ALPINE,
+            description="Alpine Linux base",
             size_estimate="~130MB",
         ),
         ImageAlternative(
-            image="cgr.dev/chainguard/node:latest",
-            reason="hardened",
-            description="Chainguard hardened image, zero CVEs",
+            image="cgr.dev/chainguard/node",
+            reason=AlternativeReason.HARDENED,
+            description="Chainguard hardened Node.js",
             size_estimate="~100MB",
         ),
     ],
-    
-    # Golang images
     "golang": [
         ImageAlternative(
             image="{name}:{version}-alpine",
-            reason="alpine",
-            description="Alpine variant for building",
+            reason=AlternativeReason.ALPINE,
+            description="Alpine build image",
             size_estimate="~250MB",
         ),
         ImageAlternative(
             image="gcr.io/distroless/static-debian12",
-            reason="distroless",
-            description="For final stage - static Go binaries only",
+            reason=AlternativeReason.DISTROLESS,
+            description="Distroless runtime for static Go binaries",
             size_estimate="~2MB",
         ),
         ImageAlternative(
-            image="cgr.dev/chainguard/go:latest",
-            reason="hardened",
+            image="cgr.dev/chainguard/go",
+            reason=AlternativeReason.HARDENED,
             description="Chainguard hardened Go build image",
             size_estimate="~200MB",
         ),
     ],
-    
-    # Java images
     "openjdk": [
         ImageAlternative(
             image="eclipse-temurin:{version}-jre-alpine",
-            reason="alpine",
-            description="Eclipse Temurin JRE on Alpine",
+            reason=AlternativeReason.ALPINE,
+            description="Temurin JRE on Alpine",
             size_estimate="~150MB",
         ),
         ImageAlternative(
             image="gcr.io/distroless/java17-debian12",
-            reason="distroless",
-            description="Google distroless Java runtime",
+            reason=AlternativeReason.DISTROLESS,
+            description="Distroless Java runtime",
             size_estimate="~200MB",
         ),
         ImageAlternative(
-            image="cgr.dev/chainguard/jre:latest",
-            reason="hardened",
+            image="cgr.dev/chainguard/jre",
+            reason=AlternativeReason.HARDENED,
             description="Chainguard hardened JRE",
             size_estimate="~100MB",
         ),
     ],
-    
-    # Ubuntu/Debian images
     "ubuntu": [
         ImageAlternative(
             image="ubuntu:{version}-minimal",
-            reason="smaller",
-            description="Ubuntu minimal variant",
+            reason=AlternativeReason.SMALLER,
+            description="Ubuntu minimal",
             size_estimate="~30MB",
         ),
         ImageAlternative(
             image="debian:{version}-slim",
-            reason="smaller",
-            description="Debian slim variant",
+            reason=AlternativeReason.SMALLER,
+            description="Debian slim",
             size_estimate="~25MB",
         ),
         ImageAlternative(
             image="cgr.dev/chainguard/wolfi-base",
-            reason="hardened",
-            description="Chainguard Wolfi base, security-focused",
+            reason=AlternativeReason.HARDENED,
+            description="Wolfi security-focused base",
             size_estimate="~15MB",
         ),
     ],
-    
     "debian": [
         ImageAlternative(
             image="debian:{version}-slim",
-            reason="smaller",
-            description="Debian slim variant",
+            reason=AlternativeReason.SMALLER,
+            description="Debian slim",
             size_estimate="~25MB",
         ),
         ImageAlternative(
             image="cgr.dev/chainguard/wolfi-base",
-            reason="hardened",
-            description="Chainguard Wolfi base, security-focused",
+            reason=AlternativeReason.HARDENED,
+            description="Wolfi security-focused base",
             size_estimate="~15MB",
         ),
     ],
-    
-    # Nginx
     "nginx": [
         ImageAlternative(
             image="nginx:{version}-alpine",
-            reason="alpine",
+            reason=AlternativeReason.ALPINE,
             description="Alpine variant",
             size_estimate="~25MB",
         ),
         ImageAlternative(
-            image="cgr.dev/chainguard/nginx:latest",
-            reason="hardened",
+            image="cgr.dev/chainguard/nginx",
+            reason=AlternativeReason.HARDENED,
             description="Chainguard hardened nginx",
             size_estimate="~15MB",
         ),
     ],
-    
-    # Redis
     "redis": [
         ImageAlternative(
             image="redis:{version}-alpine",
-            reason="alpine",
+            reason=AlternativeReason.ALPINE,
             description="Alpine variant",
             size_estimate="~30MB",
         ),
     ],
-    
-    # PostgreSQL
     "postgres": [
         ImageAlternative(
             image="postgres:{version}-alpine",
-            reason="alpine",
+            reason=AlternativeReason.ALPINE,
             description="Alpine variant",
             size_estimate="~80MB",
         ),
     ],
 }
 
-# Images that are already optimized/hardened
-ALREADY_OPTIMIZED = {
-    "alpine",
-    "distroless",
-    "chainguard",
-    "wolfi",
-    "scratch",
-    "busybox",
-    "gcr.io/distroless",
+
+# -----------------------------
+# Risk & optimization signals
+# -----------------------------
+
+RISKY_TAGS = {"latest", "dev", "development", "beta", "rc", "nightly", "unstable"}
+
+HARDENED_REGISTRIES = {
     "cgr.dev/chainguard",
+    "gcr.io/distroless",
 }
 
-# Tags that indicate security risk
-RISKY_TAGS = {
-    "latest",
-    "dev",
-    "development",
-    "beta",
-    "rc",
-    "nightly",
-    "unstable",
-}
+OPTIMIZED_TAG_MARKERS = {"slim", "alpine", "minimal", "distroless"}
+
+
+# -----------------------------
+# Parsing helpers
+# -----------------------------
+
+def _strip_digest(image: str) -> str:
+    return image.split("@", 1)[0]
 
 
 def get_base_image_name(image: str) -> str:
-    """Extract the base image name without registry, tag, or variant."""
-    # Drop digest if present
-    image = image.split("@", 1)[0]
-    # Isolate last path segment (handles registries with ports)
+    image = _strip_digest(image)
     last_segment = image.rsplit("/", 1)[-1]
-    # Remove tag only if it appears after the last "/"
     if ":" in last_segment:
         last_segment = last_segment.rsplit(":", 1)[0]
     return last_segment.lower()
 
 
 def get_image_tag(image: str) -> str:
-    # Drop digest if present
-    image = image.split("@", 1)[0]
+    image = _strip_digest(image)
     last_segment = image.rsplit("/", 1)[-1]
     if ":" in last_segment:
         return last_segment.rsplit(":", 1)[1]
-    return "latest"  # Default tag
+    return "latest"
 
 
-def is_already_optimized(image: str) -> bool:
-    """Check if an image is already considered optimized."""
-    image_lower = image.lower()
-    
-    # Check for optimized registries/prefixes
-    for prefix in ALREADY_OPTIMIZED:
-        if prefix in image_lower:
-            return True
-    
-    # Check for slim/alpine variants in tag
-    tag = get_image_tag(image).lower()
-    if any(variant in tag for variant in ["slim", "alpine", "minimal", "distroless"]):
-        return True
-    
-    return False
+def get_image_registry(image: str) -> Optional[str]:
+    parts = image.split("/")
+    if len(parts) > 1 and "." in parts[0]:
+        return parts[0]
+    return None
 
+
+# -----------------------------
+# Classification
+# -----------------------------
 
 def has_risky_tag(image: str) -> bool:
-    """Check if an image uses a risky tag."""
+    if "@" in image:
+        return False  # digest-pinned
+    return get_image_tag(image).lower() in RISKY_TAGS
+
+
+def is_hardened_image(image: str) -> bool:
+    registry = get_image_registry(image)
+    return registry in HARDENED_REGISTRIES
+
+
+def is_optimized_image(image: str) -> bool:
     tag = get_image_tag(image).lower()
-    return tag in RISKY_TAGS
+    return any(marker in tag for marker in OPTIMIZED_TAG_MARKERS)
+
+
+# -----------------------------
+# Recommendation engine
+# -----------------------------
+
+def _extract_version(tag: str) -> Optional[str]:
+    if tag in RISKY_TAGS:
+        return None
+    return tag.split("-", 1)[0]
 
 
 def get_alternatives(image: str) -> list[ImageAlternative]:
-    """Get recommended alternatives for a given image."""
-    if is_already_optimized(image):
-        return []
-    
     base_name = get_base_image_name(image)
-    tag = get_image_tag(image)
-    
-    # Extract version from tag (e.g., "3.12-bookworm" -> "3.12")
-    version = tag.split("-")[0] if "-" in tag else tag
-    
-    # Skip version templating for 'latest' - use a placeholder or skip templated alternatives
-    if version == "latest":
-        version = "latest"  # Hardcoded alternatives will still work
-    
+    tag = get_image_tag(image).lower()
+    version = _extract_version(tag)
+
     alternatives = IMAGE_ALTERNATIVES.get(base_name, [])
-    
-    # Format alternatives with actual version
-    result = []
+    results: list[ImageAlternative] = []
+
     for alt in alternatives:
-        # Skip templated alternatives when version is 'latest'
-        if version == "latest" and "{version}" in alt.image:
+        if "{version}" in alt.image and not version:
             continue
-        formatted_image = alt.image.format(name=base_name, version=version)
-        result.append(ImageAlternative(
-            image=formatted_image,
-            reason=alt.reason,
-            description=alt.description,
-            size_estimate=alt.size_estimate,
-        ))
-    
-    return result
-    return result
+
+        formatted = (
+            alt.image.format(name=base_name, version=version)
+            if "{version}" in alt.image
+            else alt.image
+        )
+
+        # Do not recommend the same image
+        if formatted == image:
+            continue
+
+        results.append(alt)
+
+    return results
