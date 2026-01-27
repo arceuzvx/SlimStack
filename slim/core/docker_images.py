@@ -203,22 +203,22 @@ RISKY_TAGS = {
 
 def get_base_image_name(image: str) -> str:
     """Extract the base image name without registry, tag, or variant."""
-    # Remove registry prefix
-    if "/" in image:
-        parts = image.split("/")
-        image = parts[-1]
-    
-    # Remove tag
-    if ":" in image:
-        image = image.split(":")[0]
-    
-    return image.lower()
+    # Drop digest if present
+    image = image.split("@", 1)[0]
+    # Isolate last path segment (handles registries with ports)
+    last_segment = image.rsplit("/", 1)[-1]
+    # Remove tag only if it appears after the last "/"
+    if ":" in last_segment:
+        last_segment = last_segment.rsplit(":", 1)[0]
+    return last_segment.lower()
 
 
 def get_image_tag(image: str) -> str:
-    """Extract the tag from an image string."""
-    if ":" in image:
-        return image.split(":")[-1]
+    # Drop digest if present
+    image = image.split("@", 1)[0]
+    last_segment = image.rsplit("/", 1)[-1]
+    if ":" in last_segment:
+        return last_segment.rsplit(":", 1)[1]
     return "latest"  # Default tag
 
 
