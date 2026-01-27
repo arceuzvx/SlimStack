@@ -256,11 +256,18 @@ def get_alternatives(image: str) -> list[ImageAlternative]:
     # Extract version from tag (e.g., "3.12-bookworm" -> "3.12")
     version = tag.split("-")[0] if "-" in tag else tag
     
+    # Skip version templating for 'latest' - use a placeholder or skip templated alternatives
+    if version == "latest":
+        version = "latest"  # Hardcoded alternatives will still work
+    
     alternatives = IMAGE_ALTERNATIVES.get(base_name, [])
     
     # Format alternatives with actual version
     result = []
     for alt in alternatives:
+        # Skip templated alternatives when version is 'latest'
+        if version == "latest" and "{version}" in alt.image:
+            continue
         formatted_image = alt.image.format(name=base_name, version=version)
         result.append(ImageAlternative(
             image=formatted_image,
@@ -269,4 +276,5 @@ def get_alternatives(image: str) -> list[ImageAlternative]:
             size_estimate=alt.size_estimate,
         ))
     
+    return result
     return result
