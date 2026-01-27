@@ -255,8 +255,6 @@ def get_alternatives(image: str) -> list[ImageAlternative]:
     
     # Extract version from tag (e.g., "3.12-bookworm" -> "3.12")
     version = tag.split("-")[0] if "-" in tag else tag
-    if version == "latest":
-        version = "latest"
     
     alternatives = IMAGE_ALTERNATIVES.get(base_name, [])
     

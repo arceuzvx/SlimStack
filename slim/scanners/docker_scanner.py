@@ -178,8 +178,10 @@ def parse_dockerfile(dockerfile_path: Path) -> list[tuple[int, str]]:
         content = dockerfile_path.read_text(encoding="utf-8")
         for i, line in enumerate(content.splitlines(), start=1):
             lines.append((i, line))
-    except Exception:
-        pass
+    except OSError as e:
+        # Log or handle file access errors appropriately
+        import logging
+        logging.warning(f"Failed to read Dockerfile {dockerfile_path}: {e}")
     return lines
 
 

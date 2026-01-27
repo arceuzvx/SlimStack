@@ -161,7 +161,7 @@ slim docker --severity warning
 ```
 
 **Example output:**
-```
+```text
 SlimStack Dockerfile Analysis
 ================================
 
