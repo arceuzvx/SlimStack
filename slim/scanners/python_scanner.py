@@ -2,8 +2,8 @@
 
 import ast
 import sys
-import subprocess
 from dataclasses import dataclass, field
+from importlib import metadata as importlib_metadata
 from pathlib import Path
 from typing import Iterator
 
@@ -19,6 +19,86 @@ from slim.core.utils import (
     find_project_root,
     warn,
 )
+
+# Module-level constant: common import names that differ from their package name
+IMPORT_TO_PACKAGE: dict[str, str] = {
+    # Imaging / Vision
+    "pil": "pillow",
+    "cv2": "opencv_python",
+    "skimage": "scikit_image",
+    # ML / Data Science
+    "sklearn": "scikit_learn",
+    "tf": "tensorflow",
+    "torch": "pytorch",
+    "pd": "pandas",  # common alias, not strict
+    "np": "numpy",   # common alias, not strict
+    "xgb": "xgboost",
+    "lgb": "lightgbm",
+    # Web / HTTP
+    "bs4": "beautifulsoup4",
+    "flask_restful": "flask_restful",
+    "jwt": "pyjwt",
+    "lxml": "lxml",
+    "httpx": "httpx",
+    "aiohttp": "aiohttp",
+    "starlette": "starlette",
+    # Serialization / Config
+    "yaml": "pyyaml",
+    "toml": "tomli",
+    "dotenv": "python_dotenv",
+    "decouple": "python_decouple",
+    "attr": "attrs",
+    "pydantic": "pydantic",
+    "marshmallow": "marshmallow",
+    # Database
+    "psycopg2": "psycopg2_binary",
+    "pymongo": "pymongo",
+    "bson": "pymongo",
+    "redis": "redis",
+    "sqlalchemy": "sqlalchemy",
+    "alembic": "alembic",
+    # Date / Time
+    "dateutil": "python_dateutil",
+    "pytz": "pytz",
+    "pendulum": "pendulum",
+    "arrow": "arrow",
+    # Crypto / Security
+    "Crypto": "pycryptodome",
+    "nacl": "pynacl",
+    "paramiko": "paramiko",
+    "cryptography": "cryptography",
+    "bcrypt": "bcrypt",
+    "fernet": "cryptography",
+    # System / Hardware
+    "serial": "pyserial",
+    "usb": "pyusb",
+    "magic": "python_magic",
+    "psutil": "psutil",
+    "pid": "pid",
+    # GUI
+    "gi": "pygobject",
+    "wx": "wxpython",
+    "tkinter": "tk",
+    # DevOps / Cloud
+    "docker": "docker",
+    "boto3": "boto3",
+    "botocore": "botocore",
+    "google_cloud": "google_cloud_core",
+    "azure": "azure_core",
+    # Testing
+    "pytest": "pytest",
+    "mock": "mock",
+    "faker": "faker",
+    "factory": "factory_boy",
+    "hypothesis": "hypothesis",
+    # Utilities
+    "tqdm": "tqdm",
+    "click": "click",
+    "typer": "typer",
+    "rich": "rich",
+    "colorama": "colorama",
+    "loguru": "loguru",
+}
 
 
 @dataclass
@@ -80,49 +160,67 @@ def get_top_level_module(import_name: str) -> str:
 
 
 def get_installed_packages() -> dict[str, PackageInfo]:
-    """Get all installed packages using pip freeze."""
+    """Get all installed packages using importlib.metadata (no subprocess)."""
     packages: dict[str, PackageInfo] = {}
-    
+
     try:
-        result = subprocess.run(
-            [sys.executable, "-m", "pip", "freeze"],
-            capture_output=True,
-            text=True,
-            timeout=30,
-        )
-        
-        if result.returncode != 0:
-            return packages
-        
-        for line in result.stdout.strip().split("\n"):
-            line = line.strip()
-            if not line or line.startswith("#"):
+        for dist in importlib_metadata.distributions():
+            name = dist.metadata["Name"]
+            if name is None:
                 continue
-            
-            # Handle different formats: pkg==version, pkg @ path, etc.
-            if "==" in line:
-                name, version = line.split("==", 1)
-            elif " @ " in line:
-                name, version = line.split(" @ ", 1)
-            elif ">=" in line:
-                name, version = line.split(">=", 1)
-            elif "<=" in line:
-                name, version = line.split("<=", 1)
-            else:
-                name = line
-                version = "unknown"
-            
-            name = name.strip()
+            version = dist.metadata["Version"] or "unknown"
             normalized = normalize_package_name(name)
             packages[normalized] = PackageInfo(
                 name=name,
-                version=version.strip(),
+                version=version,
             )
-    
-    except (subprocess.TimeoutExpired, FileNotFoundError, Exception):
+    except Exception:
         pass
-    
+
     return packages
+
+
+def get_package_requires(pkg_name: str) -> list[str]:
+    """Get the direct dependencies of an installed package."""
+    try:
+        dist = importlib_metadata.distribution(pkg_name)
+        requires = dist.requires
+        if requires is None:
+            return []
+        deps: list[str] = []
+        for req in requires:
+            # Skip extras-only requirements like 'foo ; extra == "dev"'
+            if "; extra ==" in req:
+                continue
+            # Extract just the package name (before any version specifier)
+            dep_name = req.split(";")[0].strip()
+            for ch in (">", "<", "=", "!", "~", "[", " "):
+                dep_name = dep_name.split(ch)[0]
+            if dep_name:
+                deps.append(normalize_package_name(dep_name))
+        return deps
+    except importlib_metadata.PackageNotFoundError:
+        return []
+    except Exception:
+        return []
+
+
+def build_dependency_graph(packages: dict[str, PackageInfo]) -> dict[str, set[str]]:
+    """
+    Build a mapping of package -> set of packages that depend on it.
+
+    This is the *reverse* graph: for each package, which other packages
+    list it as a requirement.
+    """
+    depended_by: dict[str, set[str]] = {pkg: set() for pkg in packages}
+
+    for pkg_name, pkg_info in packages.items():
+        for dep in get_package_requires(pkg_info.name):
+            dep_norm = normalize_package_name(dep)
+            if dep_norm in depended_by:
+                depended_by[dep_norm].add(pkg_name)
+
+    return depended_by
 
 
 def extract_imports_from_file(file_path: Path) -> Iterator[ImportInfo]:
@@ -187,24 +285,6 @@ def map_import_to_package(import_name: str, packages: dict[str, PackageInfo]) ->
     - yaml -> PyYAML
     - sklearn -> scikit-learn
     """
-    # Common import-to-package mappings
-    IMPORT_TO_PACKAGE: dict[str, str] = {
-        "pil": "pillow",
-        "cv2": "opencv_python",
-        "yaml": "pyyaml",
-        "sklearn": "scikit_learn",
-        "skimage": "scikit_image",
-        "bs4": "beautifulsoup4",
-        "dateutil": "python_dateutil",
-        "dotenv": "python_dotenv",
-        "jwt": "pyjwt",
-        "serial": "pyserial",
-        "usb": "pyusb",
-        "magic": "python_magic",
-        "gi": "pygobject",
-        "wx": "wxpython",
-    }
-    
     normalized_import = normalize_package_name(import_name)
     
     # Direct match
@@ -272,27 +352,42 @@ def scan_python_project(project_path: Path | None = None) -> ScanResult:
             
             result.used_imports.add(normalized)
     
-    # Classify packages
+    # Build dependency graph for transitive analysis
+    dep_graph = build_dependency_graph(result.installed_packages)
+    
+    # Classify packages — first pass: identify directly used
+    directly_used: set[str] = set()
     for pkg_name in result.installed_packages:
-        # Skip protected packages
         if pkg_name in PYTHON_PROTECTED_PACKAGES:
             continue
         
-        # Check if directly used
         if pkg_name in result.used_imports:
-            result.used_packages.add(pkg_name)
+            directly_used.add(pkg_name)
         else:
             # Check via mapping
-            matched = False
             for imp in result.used_imports:
                 mapped_pkg = map_import_to_package(imp, result.installed_packages)
                 if mapped_pkg == pkg_name:
-                    result.used_packages.add(pkg_name)
-                    matched = True
+                    directly_used.add(pkg_name)
                     break
-            
-            if not matched:
-                result.unused_packages.add(pkg_name)
+    
+    result.used_packages = directly_used.copy()
+    
+    # Second pass: identify transitive-only packages
+    # A package is transitive-only if it's not directly used but is required
+    # by at least one directly-used package
+    for pkg_name in result.installed_packages:
+        if pkg_name in PYTHON_PROTECTED_PACKAGES:
+            continue
+        if pkg_name in directly_used:
+            continue
+        
+        dependents = dep_graph.get(pkg_name, set())
+        if dependents & directly_used:
+            # Required by a used package → transitive
+            result.transitive_only.add(pkg_name)
+        else:
+            result.unused_packages.add(pkg_name)
     
     # Find imports that couldn't be mapped to packages
     for imp in result.used_imports:

@@ -1,0 +1,35 @@
+# SlimStack pre-commit hooks
+# Usage: Add to your .pre-commit-config.yaml:
+#
+#   repos:
+#     - repo: https://github.com/arceuzvx/SlimStack
+#       rev: v0.1.0
+#       hooks:
+#         - id: slimstack-scan-py
+#         - id: slimstack-scan-node
+
+- id: slimstack-scan-py
+  name: SlimStack Python dependency check
+  entry: slim scan -py --fail-on-unused
+  language: python
+  types: [python]
+  pass_filenames: false
+  always_run: true
+  stages: [pre-commit]
+
+- id: slimstack-scan-node
+  name: SlimStack Node.js dependency check
+  entry: slim scan -node --fail-on-unused
+  language: python
+  types_or: [javascript, jsx, ts, tsx]
+  pass_filenames: false
+  always_run: true
+  stages: [pre-commit]
+
+- id: slimstack-docker
+  name: SlimStack Dockerfile analysis
+  entry: slim docker
+  language: python
+  files: Dockerfile
+  pass_filenames: false
+  stages: [pre-commit]

@@ -153,16 +153,16 @@ def extract_imports_from_file(file_path: Path) -> Iterator[NodeImportInfo]:
     except Exception:
         return
     
-    lines = content.split("\n")
+    # Pre-build line offset index for O(log n) lookups
+    import bisect
+    line_offsets: list[int] = []
+    offset = 0
+    for line in content.split("\n"):
+        line_offsets.append(offset)
+        offset += len(line) + 1  # +1 for newline
     
-    # Track which line each match is on
     def find_line_number(match_start: int) -> int:
-        char_count = 0
-        for i, line in enumerate(lines, 1):
-            char_count += len(line) + 1  # +1 for newline
-            if char_count > match_start:
-                return i
-        return 1
+        return bisect.bisect_right(line_offsets, match_start)
     
     # Find require() calls
     for match in REQUIRE_PATTERN.finditer(content):

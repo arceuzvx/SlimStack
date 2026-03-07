@@ -69,17 +69,69 @@ Initial release of SlimStack - Dependency hygiene and waste elimination CLI tool
   - Unix man page (`man slim`)
   - Built-in manual (`slim man`)
 
+## [0.2.0] - 2026-03-08
+
+Major release with bug fixes, new features, performance improvements, and 205 unit tests.
+
+### Fixed
+
+- **Broken `slim docker` command** — `is_already_optimized` import was missing from `docker_images.py`
+- **Hardened image detection** — `is_hardened_image()` never matched Chainguard/distroless registries due to prefix comparison bug
+
+### Added
+
+- **Configuration file support** (`.slimrc.toml`)
+  - Exclude packages, set default flags, per-ecosystem settings
+  - Walks up directory tree, falls back to home directory
+  - `[python]`, `[node]`, `[docker]`, `[defaults]` sections
+
+- **CI integration**
+  - `--fail-on-unused` flag returns exit code 1 when unused packages found
+  - Configurable via `.slimrc.toml`: `fail_on_unused = true`
+  - GitHub Actions workflow template (`.github/workflows/slimstack.yml`)
+  - Pre-commit hooks (`.pre-commit-hooks.yaml`)
+
+- **Cache cleanup command** (`slim clean`)
+  - Scans for `__pycache__`, `.pytest_cache`, `.mypy_cache`, `.ruff_cache`, `.next`, `node_modules/.cache`
+  - Dry-run by default, `--force` to delete, `-i` for interactive selection
+  - `--include-builds` for dist/build/out directories
+
+- **Declared dependency parsing**
+  - `requirements.txt` parsing with version spec support
+  - `pyproject.toml` parsing (PEP 621 + Poetry format)
+  - Warns about "declared but not installed" packages
+  - Shows "installed but not declared" in verbose mode
+
+- **Transitive dependency analysis**
+  - Builds reverse dependency graph via `importlib.metadata`
+  - Classifies packages as directly-used, transitive-only, or truly unused
+
+- **CLI enhancements**
+  - `--verbose` / `--quiet` global flags
+  - `--exclude PKG ...` for scan and prune commands
+  - Animated progress spinner for long operations
+  - `.dockerignore`-aware COPY . . warning (downgraded to info when present)
+
+- **Test suite** — 205 unit tests across 8 test files
+  - Tests for utils, docker_images, python_scanner, node_scanner, docker_scanner, config_loader, deps_parser, cache_scanner
+
+### Changed
+
+- **Python scanning uses `importlib.metadata`** instead of `pip freeze` subprocess — instant, no 30s timeout
+- **Import-to-package mappings** expanded from 15 to 55+ entries (ML, web, database, crypto, DevOps, utilities)
+- **Node.js scanner** uses `bisect`-based line offset index — O(log n) lookups instead of O(n×m)
+- `IMPORT_TO_PACKAGE` moved from function-local to module-level constant
+- Added `pytest` to optional dev dependencies in `pyproject.toml`
+
 ## [Unreleased]
 
 ### Planned
 
-- Transitive dependency analysis
-- Requirements.txt / pyproject.toml sync
-- Monorepo support
-- Cache cleanup (pytest, mypy, ruff)
-- Interactive mode for package selection
-- Configuration file support
-- Pre-commit hook integration
+- Monorepo support (pnpm-workspace, lerna)
+- Interactive prune mode with arrow-key selection
+- Yarn/pnpm package manager support
+
 
 [0.1.0]: https://github.com/arceuzvx/SlimStack/releases/tag/v0.1.0
-[Unreleased]: https://github.com/arceuzvx/SlimStack/compare/v0.1.0...HEAD
+[0.2.0]: https://github.com/arceuzvx/SlimStack/releases/tag/v0.2.0
+[Unreleased]: https://github.com/arceuzvx/SlimStack/compare/v0.2.0...HEAD

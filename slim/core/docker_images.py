@@ -234,13 +234,17 @@ def has_risky_tag(image: str) -> bool:
 
 
 def is_hardened_image(image: str) -> bool:
-    registry = get_image_registry(image)
-    return registry in HARDENED_REGISTRIES
+    return any(image.startswith(registry) for registry in HARDENED_REGISTRIES)
 
 
 def is_optimized_image(image: str) -> bool:
     tag = get_image_tag(image).lower()
     return any(marker in tag for marker in OPTIMIZED_TAG_MARKERS)
+
+
+def is_already_optimized(image: str) -> bool:
+    """Check if an image is already optimized or hardened (no further recommendations needed)."""
+    return is_optimized_image(image) or is_hardened_image(image)
 
 
 # -----------------------------

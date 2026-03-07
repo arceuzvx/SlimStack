@@ -3,7 +3,7 @@
 from typing import Final
 
 # Version info
-VERSION: Final[str] = "0.1.0"
+VERSION: Final[str] = "0.2.0"
 
 # Protected packages - never uninstall these
 PYTHON_PROTECTED_PACKAGES: Final[frozenset[str]] = frozenset({

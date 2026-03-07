@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "slimstack"
-version = "0.1.0"
+version = "0.2.0"
 description = "CLI tool for dependency hygiene and waste elimination"
 readme = "README.md"
 license = {text = "MIT"}
@@ -27,6 +27,9 @@ classifiers = [
 
 [project.scripts]
 slim = "slim.cli:main"
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0"]
 
 [project.urls]
 Homepage = "https://github.com/arceuzvx/SlimStack"

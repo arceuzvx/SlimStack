@@ -27,17 +27,66 @@ Usage:
 
 import argparse
 import sys
+import threading
+import time
 from pathlib import Path
 
 from slim import __version__
 from slim.core.config import Colors, VERSION
+from slim.core.config_loader import load_config, SlimConfig
 from slim.core.utils import (
     output_json,
     is_tty,
     error,
     info,
+    warn,
     format_size,
 )
+
+
+# Global config instance, loaded in main()
+_config: SlimConfig = SlimConfig()
+
+
+class Spinner:
+    """Simple CLI spinner for long-running operations."""
+
+    FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
+
+    def __init__(self, message: str = "Working..."):
+        self._message = message
+        self._running = False
+        self._thread: threading.Thread | None = None
+
+    def start(self) -> None:
+        if not is_tty():
+            print(f"→ {self._message}")
+            return
+        self._running = True
+        self._thread = threading.Thread(target=self._spin, daemon=True)
+        self._thread.start()
+
+    def _spin(self) -> None:
+        i = 0
+        while self._running:
+            frame = self.FRAMES[i % len(self.FRAMES)]
+            print(f"\r{Colors.CYAN}{frame}{Colors.RESET} {self._message}", end="", flush=True)
+            time.sleep(0.08)
+            i += 1
+
+    def stop(self) -> None:
+        self._running = False
+        if self._thread:
+            self._thread.join(timeout=1)
+        if is_tty():
+            print("\r" + " " * (len(self._message) + 4) + "\r", end="", flush=True)
+
+    def __enter__(self) -> "Spinner":
+        self.start()
+        return self
+
+    def __exit__(self, *args: object) -> None:
+        self.stop()
 
 
 def cmd_version(args: argparse.Namespace) -> int:
@@ -398,17 +447,44 @@ All commands support {green("--json")} for machine-readable output:
     return 0
 
 
+def _get_exclusions(args: argparse.Namespace, ecosystem: str) -> set[str]:
+    """Gather excluded packages from CLI flags and config."""
+    excluded: set[str] = set()
+    # From config
+    excluded.update(_config.exclude_packages)
+    if ecosystem == "python":
+        excluded.update(_config.python_exclude)
+    elif ecosystem == "node":
+        excluded.update(_config.node_exclude)
+    # From CLI --exclude flag
+    if hasattr(args, "exclude") and args.exclude:
+        excluded.update(args.exclude)
+    return {e.lower().replace("-", "_") for e in excluded}
+
+
 def _scan_python(args: argparse.Namespace) -> int:
     """Scan Python project for dependencies."""
     from slim.scanners.python_scanner import scan_python_project, get_scan_result_dict
+    from slim.scanners.deps_parser import find_and_parse_declared_deps
     from slim.visuals.tables import render_package_table, render_summary_box
     
     project_path = Path(args.path) if args.path else None
     result = scan_python_project(project_path)
     
+    # Apply exclusions
+    exclusions = _get_exclusions(args, "python")
+    result.unused_packages -= exclusions
+    
+    # Parse declared dependencies
+    declared = find_and_parse_declared_deps(result.project_path)
+    
     if args.json:
-        output_json(get_scan_result_dict(result))
-        return 0
+        data = get_scan_result_dict(result)
+        if declared:
+            data["declared_source"] = str(declared.source_file)
+            data["declared_count"] = len(declared.dependencies)
+        output_json(data)
+        return 1 if (args.fail_on_unused and result.unused_packages) else 0
     
     # Human-readable output
     colors_enabled = is_tty()
@@ -421,14 +497,54 @@ def _scan_python(args: argparse.Namespace) -> int:
     print("=" * 35)
     
     # Summary
-    print(render_summary_box("Summary", [
+    summary_items = [
         ("Project", str(result.project_path)),
         ("Virtual Env", "Yes" if result.in_virtualenv else "No"),
         ("Files Scanned", str(result.files_scanned)),
         ("Packages Installed", str(len(result.installed_packages))),
         ("Packages Used", str(len(result.used_packages))),
         ("Packages Unused", str(len(result.unused_packages))),
-    ]))
+    ]
+    if declared:
+        summary_items.insert(3, ("Declared Deps", f"{len(declared.dependencies)} ({declared.source_file.name})"))
+    print(render_summary_box("Summary", summary_items))
+    
+    # Config file notice
+    if _config.config_path and not args.quiet:
+        info(f"Config: {_config.config_path}")
+    if exclusions and not args.quiet:
+        info(f"Excluding {len(exclusions)} package(s) from config/flags")
+    
+    # Declared deps warnings
+    if declared and not args.quiet:
+        declared_names = set(declared.dependencies.keys())
+        installed_names = set(result.installed_packages.keys())
+        
+        not_installed = declared_names - installed_names
+        if not_installed:
+            print()
+            if colors_enabled:
+                print(f"{Colors.RED}Declared but not installed:{Colors.RESET}")
+            else:
+                print("Declared but not installed:")
+            for pkg in sorted(not_installed):
+                print(f"  ✗ {pkg}")
+        
+        if args.verbose:
+            not_declared = installed_names - declared_names - exclusions
+            # Filter to only direct packages, skip protected
+            from slim.core.config import PYTHON_PROTECTED_PACKAGES
+            not_declared -= PYTHON_PROTECTED_PACKAGES
+            if not_declared and declared:
+                print()
+                if colors_enabled:
+                    print(f"{Colors.DIM}Installed but not declared in {declared.source_file.name}:{Colors.RESET}")
+                else:
+                    print(f"Installed but not declared in {declared.source_file.name}:")
+                for pkg in sorted(not_declared)[:10]:
+                    print(f"  ? {pkg}")
+                if len(not_declared) > 10:
+                    print(f"  ... and {len(not_declared) - 10} more")
     
     # Unused packages
     if result.unused_packages:
@@ -448,7 +564,7 @@ def _scan_python(args: argparse.Namespace) -> int:
         print(f"\n{Colors.GREEN if colors_enabled else ''}✓ No unused packages found!{Colors.RESET if colors_enabled else ''}")
     
     # Unknown imports
-    if result.unknown_imports:
+    if result.unknown_imports and not args.quiet:
         print()
         if colors_enabled:
             print(f"{Colors.DIM}Unknown imports (couldn't map to packages):{Colors.RESET}")
@@ -459,6 +575,9 @@ def _scan_python(args: argparse.Namespace) -> int:
         if len(result.unknown_imports) > 10:
             print(f"  ... and {len(result.unknown_imports) - 10} more")
     
+    # CI exit code
+    if args.fail_on_unused and result.unused_packages:
+        return 1
     return 0
 
 
@@ -489,9 +608,14 @@ def _scan_node(args: argparse.Namespace) -> int:
     project_path = Path(args.path) if args.path else None
     result = scan_node_project(project_path)
     
+    # Apply exclusions
+    exclusions = _get_exclusions(args, "node")
+    result.unused_packages -= exclusions
+    result.unused_dev_packages -= exclusions
+    
     if args.json:
         output_json(get_scan_result_dict(result))
-        return 0
+        return 1 if (args.fail_on_unused and result.unused_packages) else 0
     
     # Human-readable output
     colors_enabled = is_tty()
@@ -517,6 +641,12 @@ def _scan_node(args: argparse.Namespace) -> int:
         ("Unused Deps", str(len(result.unused_packages))),
     ]))
     
+    # Config file notice
+    if _config.config_path and not args.quiet:
+        info(f"Config: {_config.config_path}")
+    if exclusions and not args.quiet:
+        info(f"Excluding {len(exclusions)} package(s) from config/flags")
+    
     # Unused packages
     if result.unused_packages:
         print()
@@ -535,7 +665,7 @@ def _scan_node(args: argparse.Namespace) -> int:
         print(f"\n{Colors.GREEN if colors_enabled else ''}✓ All dependencies are used!{Colors.RESET if colors_enabled else ''}")
     
     # Unused dev dependencies
-    if result.unused_dev_packages:
+    if result.unused_dev_packages and not args.quiet:
         print()
         if colors_enabled:
             print(f"{Colors.DIM}Potentially unused devDependencies:{Colors.RESET}")
@@ -547,6 +677,9 @@ def _scan_node(args: argparse.Namespace) -> int:
             print(f"  ... and {len(result.unused_dev_packages) - 5} more")
         print("  (Note: devDeps may be used in config files or tests)")
     
+    # CI exit code
+    if args.fail_on_unused and result.unused_packages:
+        return 1
     return 0
 
 
@@ -601,8 +734,10 @@ def cmd_disk(args: argparse.Namespace) -> int:
     scan_path = Path(args.path) if args.path else None
     top_n = args.top if args.top else None
     
-    info("Scanning disk usage (this may take a moment)...")
+    spinner = Spinner("Scanning disk usage (this may take a moment)...")
+    spinner.start()
     result = scan_disk(scan_path, include_docker=True)
+    spinner.stop()
     
     if args.json:
         output_json(get_scan_result_dict(result, top_n))
@@ -791,6 +926,130 @@ def cmd_docker_scan(args: argparse.Namespace) -> int:
     return 1 if critical > 0 else 0
 
 
+def _interactive_select(items: list[str], prompt: str = "Select items") -> list[int]:
+    """Simple interactive selector using numbered list + input."""
+    if not items:
+        return []
+    
+    print(f"\n{Colors.BOLD}{prompt}{Colors.RESET}")
+    print("Enter numbers separated by commas (or 'all' / 'none'):")
+    print()
+    for i, item in enumerate(items, 1):
+        print(f"  {Colors.CYAN}[{i}]{Colors.RESET} {item}")
+    print()
+    
+    try:
+        choice = input(f"{Colors.BOLD}> {Colors.RESET}").strip().lower()
+    except (EOFError, KeyboardInterrupt):
+        return []
+    
+    if choice == "all":
+        return list(range(len(items)))
+    if choice in ("none", "", "q", "quit"):
+        return []
+    
+    selected: list[int] = []
+    for part in choice.split(","):
+        part = part.strip()
+        if part.isdigit():
+            idx = int(part) - 1
+            if 0 <= idx < len(items):
+                selected.append(idx)
+    
+    return selected
+
+
+def cmd_clean(args: argparse.Namespace) -> int:
+    """Clean development cache directories."""
+    from slim.scanners.cache_scanner import (
+        scan_caches,
+        clean_caches,
+        get_clean_result_dict,
+    )
+    
+    scan_path = Path(args.path) if args.path else None
+    include_builds = getattr(args, "include_builds", False)
+    interactive = getattr(args, "interactive", False)
+    
+    with Spinner("Scanning for cache directories..."):
+        result = scan_caches(
+            scan_path=scan_path,
+            include_builds=include_builds,
+        )
+    
+    if args.json:
+        output_json(get_clean_result_dict(result))
+        return 0
+    
+    colors_enabled = is_tty()
+    
+    print()
+    if colors_enabled:
+        print(f"{Colors.BOLD}SlimStack Cache Cleanup{Colors.RESET}")
+    else:
+        print("SlimStack Cache Cleanup")
+    print("=" * 30)
+    
+    if not result.entries:
+        print(f"\n{Colors.GREEN if colors_enabled else ''}✓ No cache directories found!{Colors.RESET if colors_enabled else ''}")
+        return 0
+    
+    # Group by category
+    by_cat: dict[str, list] = {}
+    for entry in result.entries:
+        by_cat.setdefault(entry.category, []).append(entry)
+    
+    cat_icons = {"python": "🐍", "node": "📦", "general": "📁", "build": "🏗️"}
+    
+    for cat, entries in by_cat.items():
+        icon = cat_icons.get(cat, "📁")
+        cat_size = sum(e.size for e in entries)
+        print(f"\n{icon} {Colors.BOLD if colors_enabled else ''}{cat.title()}{Colors.RESET if colors_enabled else ''} ({format_size(cat_size)})")
+        for entry in entries:
+            rel_path = entry.path
+            try:
+                rel_path = entry.path.relative_to(result.scan_path)
+            except ValueError:
+                pass
+            print(f"  {Colors.DIM if colors_enabled else ''}{rel_path}{Colors.RESET if colors_enabled else ''} ({format_size(entry.size)})")
+    
+    print(f"\n{Colors.BOLD if colors_enabled else ''}Total: {len(result.entries)} cache directories, {format_size(result.total_size)}{Colors.RESET if colors_enabled else ''}")
+    
+    if not args.force:
+        print(f"\n→ Run 'slim clean --force' to remove all caches")
+        if not include_builds:
+            print(f"  Add '--include-builds' to also clean dist/build/out directories")
+        return 0
+    
+    # Force mode — actually delete
+    entries_to_clean = result.entries
+    
+    if interactive:
+        items = [
+            f"{e.name} ({format_size(e.size)}) — {e.path}"
+            for e in result.entries
+        ]
+        selected = _interactive_select(items, "Select caches to remove")
+        if not selected:
+            print("No items selected. Aborting.")
+            return 0
+        entries_to_clean = [result.entries[i] for i in selected]
+    else:
+        # Confirm before deleting
+        from slim.core.utils import confirm_action
+        if not confirm_action(f"Remove {len(entries_to_clean)} cache directories ({format_size(result.total_size)})?"):
+            print("Aborted.")
+            return 0
+    
+    clean_caches(result, entries_to_clean)
+    
+    if result.errors:
+        for err in result.errors:
+            error(err)
+    
+    print(f"\n{Colors.GREEN if colors_enabled else ''}✓ Removed {result.cleaned_count} directories, freed {format_size(result.cleaned_size)}{Colors.RESET if colors_enabled else ''}")
+    return 0
+
 def create_parser() -> argparse.ArgumentParser:
     """Create the argument parser."""
     parser = argparse.ArgumentParser(
@@ -798,6 +1057,10 @@ def create_parser() -> argparse.ArgumentParser:
         description="SlimStack - Dependency hygiene and waste elimination",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
+    
+    # Global flags
+    parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output")
+    parser.add_argument("--quiet", "-q", action="store_true", help="Minimal output (suppress info messages)")
     
     subparsers = parser.add_subparsers(dest="command", help="Commands")
     
@@ -820,6 +1083,10 @@ def create_parser() -> argparse.ArgumentParser:
     scan_lang_group.add_argument("-node", "--node", action="store_true", dest="lang_node", help="Scan Node.js project")
     scan_parser.add_argument("--json", action="store_true", help="Output as JSON")
     scan_parser.add_argument("--path", "-p", help="Project path (default: current directory)")
+    scan_parser.add_argument("--fail-on-unused", action="store_true", dest="fail_on_unused",
+                             help="Return non-zero exit code if unused packages found (for CI)")
+    scan_parser.add_argument("--exclude", nargs="*", metavar="PKG",
+                             help="Packages to exclude from unused report")
     scan_parser.set_defaults(func=cmd_scan)
     
     # prune command with language flags
@@ -832,6 +1099,8 @@ def create_parser() -> argparse.ArgumentParser:
     prune_parser.add_argument("--include-dev", action="store_true", help="Also remove unused devDependencies (Node.js only)")
     prune_parser.add_argument("--json", action="store_true", help="Output as JSON")
     prune_parser.add_argument("--path", "-p", help="Project path (default: current directory)")
+    prune_parser.add_argument("--exclude", nargs="*", metavar="PKG",
+                             help="Packages to exclude from pruning")
     prune_parser.set_defaults(func=cmd_prune)
     
     # disk command
@@ -852,11 +1121,24 @@ def create_parser() -> argparse.ArgumentParser:
                                help="Only show security-related issues")
     docker_parser.set_defaults(func=cmd_docker_scan)
     
+    # clean command
+    clean_parser = subparsers.add_parser("clean", help="Remove development cache directories")
+    clean_parser.add_argument("--force", action="store_true", help="Actually remove cache directories")
+    clean_parser.add_argument("--include-builds", action="store_true", dest="include_builds",
+                              help="Also clean dist/build/out directories")
+    clean_parser.add_argument("-i", "--interactive", action="store_true",
+                              help="Interactively select which caches to remove")
+    clean_parser.add_argument("--json", action="store_true", help="Output as JSON")
+    clean_parser.add_argument("--path", "-p", help="Path to scan (default: current directory)")
+    clean_parser.set_defaults(func=cmd_clean)
+    
     return parser
 
 
 def main() -> int:
     """Main entry point."""
+    global _config
+    
     # Disable colors if not a TTY
     if not is_tty():
         Colors.disable()
@@ -864,10 +1146,33 @@ def main() -> int:
     parser = create_parser()
     args = parser.parse_args()
     
+    # Ensure verbose/quiet are always available
+    if not hasattr(args, "verbose"):
+        args.verbose = False
+    if not hasattr(args, "quiet"):
+        args.quiet = False
+    if not hasattr(args, "fail_on_unused"):
+        args.fail_on_unused = False
+    
     # Handle no command
     if args.command is None:
         parser.print_help()
         return 0
+    
+    # Load config file
+    project_path = Path(args.path) if hasattr(args, "path") and args.path else None
+    _config = load_config(start_path=project_path)
+    
+    # Apply config defaults to args (CLI flags take priority)
+    if _config.fail_on_unused and not args.fail_on_unused:
+        args.fail_on_unused = True
+    if _config.default_verbose and not args.verbose:
+        args.verbose = True
+    if _config.default_quiet and not args.quiet:
+        args.quiet = True
+    
+    if args.verbose and _config.config_path:
+        info(f"Loaded config from {_config.config_path}")
     
     # Execute command
     if hasattr(args, "func"):

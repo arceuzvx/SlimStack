@@ -1,0 +1,105 @@
+# SlimStack CI - Dependency hygiene checks
+# Add this to your repository's .github/workflows/ directory
+
+name: SlimStack Dependency Check
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  slimstack-python:
+    name: Python Dependency Scan
+    runs-on: ubuntu-latest
+    if: hashFiles('requirements.txt') != '' || hashFiles('pyproject.toml') != ''
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      
+      - name: Install dependencies
+        run: |
+          python -m venv .venv
+          source .venv/bin/activate
+          pip install -r requirements.txt 2>/dev/null || pip install -e ".[dev]" 2>/dev/null || true
+          pip install slimstack
+      
+      - name: Run SlimStack scan
+        run: |
+          source .venv/bin/activate
+          slim scan -py --fail-on-unused --json > slimstack-report.json || exit_code=$?
+          slim scan -py
+          exit ${exit_code:-0}
+      
+      - name: Upload scan report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: slimstack-python-report
+          path: slimstack-report.json
+
+  slimstack-node:
+    name: Node.js Dependency Scan
+    runs-on: ubuntu-latest
+    if: hashFiles('package.json') != ''
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Install SlimStack
+        run: pip install slimstack
+      
+      - name: Run SlimStack scan
+        run: |
+          slim scan -node --fail-on-unused --json > slimstack-report.json || exit_code=$?
+          slim scan -node
+          exit ${exit_code:-0}
+      
+      - name: Upload scan report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: slimstack-node-report
+          path: slimstack-report.json
+
+  slimstack-docker:
+    name: Dockerfile Analysis
+    runs-on: ubuntu-latest
+    if: hashFiles('Dockerfile') != ''
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      
+      - name: Install SlimStack
+        run: pip install slimstack
+      
+      - name: Analyze Dockerfile
+        run: |
+          slim docker --json > slimstack-docker-report.json
+          slim docker
+      
+      - name: Upload Docker report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: slimstack-docker-report
+          path: slimstack-docker-report.json

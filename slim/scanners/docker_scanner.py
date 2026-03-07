@@ -185,7 +185,7 @@ def parse_dockerfile(dockerfile_path: Path) -> list[tuple[int, str]]:
     return lines
 
 
-def analyze_dockerfile(lines: list[tuple[int, str]]) -> DockerScanResult:
+def analyze_dockerfile(lines: list[tuple[int, str]], has_dockerignore: bool = False) -> DockerScanResult:
     """Analyze Dockerfile lines for issues and recommendations."""
     result = DockerScanResult(
         dockerfile_path=Path("Dockerfile"),
@@ -305,13 +305,22 @@ def analyze_dockerfile(lines: list[tuple[int, str]]) -> DockerScanResult:
         
         # Check COPY . . (copies everything)
         if PATTERNS["copy_all"].match(stripped):
-            result.issues.append(DockerfileIssue(
-                line_number=line_num,
-                severity="warning",
-                category="security",
-                message="COPY . . may include sensitive files (.git, .env, secrets)",
-                suggestion="Use .dockerignore or copy specific files/directories",
-            ))
+            if has_dockerignore:
+                result.issues.append(DockerfileIssue(
+                    line_number=line_num,
+                    severity="info",
+                    category="best-practice",
+                    message="COPY . . used (mitigated by .dockerignore)",
+                    suggestion="Verify .dockerignore excludes .git, .env, secrets, and node_modules",
+                ))
+            else:
+                result.issues.append(DockerfileIssue(
+                    line_number=line_num,
+                    severity="warning",
+                    category="security",
+                    message="COPY . . may include sensitive files (.git, .env, secrets)",
+                    suggestion="Add a .dockerignore file or copy specific files/directories",
+                ))
     
     # Set result properties
     result.base_images = from_images
@@ -393,7 +402,12 @@ def scan_dockerfile(
     
     # Parse and analyze
     lines = parse_dockerfile(dockerfile_path)
-    result = analyze_dockerfile(lines)
+    
+    # Check for .dockerignore
+    dockerignore_path = dockerfile_path.parent / ".dockerignore"
+    has_dockerignore = dockerignore_path.is_file()
+    
+    result = analyze_dockerfile(lines, has_dockerignore=has_dockerignore)
     result.dockerfile_path = dockerfile_path
     
     return result
